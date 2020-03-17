@@ -22,7 +22,7 @@ function UserDAO(db) {
             firstName: firstName,
             lastName: lastName,
             benefitStartDate: this.getRandomFutureDate(),
-            password: password //received from request param
+            password: bcrypt.hashSync(password, bcrypt.genSaltSync()) //received from request param
             /*
             // Fix for A2-1 - Broken Auth
             // Stores password  in a safer way using one way encryption and salt hashing
@@ -66,7 +66,7 @@ function UserDAO(db) {
 
         // Helper function to compare passwords
         function comparePassword(fromDB, fromUser) {
-            return fromDB === fromUser;
+            return bcrypt.compareSync(fromDB, fromUser);
             /*
             // Fix for A2-Broken Auth
             // compares decrypted password stored in this.addUser()

@@ -1,5 +1,4 @@
 "use strict";
-
 var express = require("express");
 var favicon = require("serve-favicon");
 var bodyParser = require("body-parser");
@@ -11,11 +10,22 @@ var swig = require("swig");
 var MongoClient = require("mongodb").MongoClient; // Driver for connecting to MongoDB
 var http = require("http");
 var marked = require("marked");
+const helmet = require("helmet")
+const noSniff = require('dont-sniff-mimetype')
 //var helmet = require("helmet");
 //var nosniff = require('dont-sniff-mimetype');
 var app = express(); // Web framework to handle routing requests
 var routes = require("./app/routes");
-var config = require("./config/config"); // Application config properties
+var config = require("./config/config");
+var fs = require("fs");
+var https = require("https");
+var path = require("path");
+var httpsOptions = {
+    key: fs.readFileSync(path.resolve(__dirname, "./artifacts/cert/server.key")),
+    cert: fs.readFileSync(path.resolve(__dirname, "./artifacts/cert/server.crt"))
+};
+
+// Application config properties
 /*
 // Fix for A6-Sensitive Data Exposure
 // Load keys for establishing secure HTTPS connection
@@ -45,7 +55,6 @@ MongoClient.connect(config.db, function(err, db) {
 
     // Prevent opening page in frame or iframe to protect from clickjacking
     app.use(helmet.xframe());
-
     // Prevents browser from caching and storing page
     app.use(helmet.noCache());
 
@@ -68,9 +77,21 @@ MongoClient.connect(config.db, function(err, db) {
 
     // Adding/ remove HTTP Headers for security
     app.use(favicon(__dirname + "/app/assets/favicon.ico"));
+    app.use(helmet())
+    app.use(helmet.contentSecurityPolicy({
+  directives: {
+    defaultSrc: ["'self'"],
+    styleSrc: ["'self'", 'maxcdn.bootstrapcdn.com']
+  }
+}));
 
     // Express middleware to populate "req.body" so we can access POST variables
     app.use(bodyParser.json());
+    app.disable("x-powered-by");
+    app.use(helmet.frameguard());
+    app.use(helmet.noCache());
+    app.use(helmet.hsts());
+    app.use(noSniff());
     app.use(bodyParser.urlencoded({
         // Mandatory in Express v4
         extended: false
@@ -84,7 +105,12 @@ MongoClient.connect(config.db, function(err, db) {
         secret: config.cookieSecret,
         // Both mandatory in Express v4
         saveUninitialized: true,
-        resave: true
+        resave: true,
+        key : "sessionId",
+        cookie: {
+        httpOnly: true,
+        secure: true
+    }
         /*
         // Fix for A5 - Security MisConfig
         // Use generic cookie name
@@ -100,7 +126,6 @@ MongoClient.connect(config.db, function(err, db) {
             // secure: true
         }
         */
-
     }));
 
     /*
@@ -133,8 +158,9 @@ MongoClient.connect(config.db, function(err, db) {
 
     // Template system setup
     swig.setDefaults({
+       root: __dirname + "/app/views",
         // Autoescape disabled
-        autoescape: false
+        autoescape: true
         /*
         // Fix for A3 - XSS, enable auto escaping
         autoescape: true // default value
@@ -142,16 +168,14 @@ MongoClient.connect(config.db, function(err, db) {
     });
 
     // Insecure HTTP connection
-    http.createServer(app).listen(config.port, function() {
+    https.createServer(httpsOptions, app).listen(config.port, function() {
         console.log("Express http server listening on port " + config.port);
     });
-
-    /*
     // Fix for A6-Sensitive Data Exposure
     // Use secure HTTPS protocol
-    https.createServer(httpsOptions, app).listen(config.port,  function() {
+
+    /*https.createServer(httpsOptions, app).listen(config.port,  function() {
         console.log("Express https server listening on port " + config.port);
-    });
-    */
+    });*/
 
 });
