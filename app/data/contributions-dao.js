@@ -85,5 +85,3 @@ function ContributionsDAO(db) {
 }
 
 module.exports.ContributionsDAO = ContributionsDAO;
-
-//lol
